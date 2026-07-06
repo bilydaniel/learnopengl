@@ -1,0 +1,13 @@
+try software renderer if i get stuck on opengl
+https://marianpekar.com/blog/software-renderer-in-odin-from-scratch-part-i
+
+immeadeate old, core profile
+extensions
+opengl works as a state machine(context)
+
+uses objects to set state
+
+you create an object, save it as an id and bind it(apply it), by unbinding, you remove the effect of the object, you can rebind later, the objects is still saved
+objects can contain models
+
+GLFW is a library for input and window
