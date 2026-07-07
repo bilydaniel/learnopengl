@@ -11,3 +11,27 @@ you create an object, save it as an id and bind it(apply it), by unbinding, you 
 objects can contain models
 
 GLFW is a library for input and window
+
+opengl pipeline: 3d -> 2d -> pixels
+pipeline has many steps, each steps has a default shader that does the work, we can replce the shaders
+
+vertex data -> vertex shader -> shape assembly -> geometry shader -> rasterization -> fragment shader -> tests and blending(all the steps with shaders can be swapped)
+
+when sending vertex data we need to tell the gpu what that data means, we use primitives
+
+vertex shader takes 3d coords and transorms them into different 3d coordinates, we can do some basic processing of the vertex attributes
+
+The primitive assembly stage takes as input all the vertices (or vertex if GL_POINTS is chosen) from the vertex shader that form a primitive and assembles all the point(s) in the primitive shape given; in this case a triangle.
+
+The output of the primitive assembly stage is passed to the geometry shader. The geometry shader takes as input a collection of vertices that form a primitive and has the ability to generate other shapes by emitting new vertices to form new (or other) primitive(s). In this example case, it generates a second triangle out of the given shape.
+
+The output of the geometry shader is then passed on to the rasterization stage where it maps the resulting primitive(s) to the corresponding pixels on the final screen, resulting in fragments for the fragment shader to use. Before the fragment shaders run, clipping is performed. Clipping discards all fragments that are outside your view, increasing performance.
+
+A fragment in OpenGL is all the data required for OpenGL to render a single pixel.
+
+The main purpose of the fragment shader is to calculate the final color of a pixel and this is usually the stage where all the advanced OpenGL effects occur. Usually the fragment shader contains data about the 3D scene that it can use to calculate the final pixel color (like lights, shadows, color of the light and so on).
+
+After all the corresponding color values have been determined, the final object will then pass through one more stage that we call the alpha test and blending stage. This stage checks the corresponding depth (and stencil) value (we’ll get to those later) of the fragment and uses those to check if the resulting fragment is in front or behind other objects and should be discarded accordingly. The stage also checks for alpha values (alpha values define the opacity of an object) and blends the objects accordingly. So even if a pixel output color is calculated in the fragment shader, the final pixel color could still be something entirely different when rendering multiple triangles.
+
+
+vertex buffer objects - store data on the gpu, sending them there is slow, so send batches, quick when they are already there, its the same as any open gl object
