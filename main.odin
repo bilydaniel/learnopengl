@@ -3,8 +3,11 @@ package main
 import "base:runtime"
 import "core:fmt"
 import "core:log"
+import "core:strings"
 import gl "vendor:OpenGL"
 import "vendor:glfw"
+
+VERTEX_SHADER_SOURCE :: string(#load("shader.vert"))
 
 main :: proc() {
 	context.logger = log.create_console_logger()
@@ -59,6 +62,12 @@ main :: proc() {
 		gl.STATIC_DRAW,
 	) // array_buffer = vbo (its bound)
 
+	vertexShaderId := gl.CreateShader(gl.VERTEX_SHADER)
+	cVertexShaderSouce := strings.clone_to_cstring(VERTEX_SHADER_SOURCE)
+	gl.ShaderSource(vertexShaderId, 1, &cVertexShaderSouce, nil)
+	gl.CompileShader(vertexShaderId)
+	checkShaderCompilation(vertexShaderId)
+
 
 	for !glfw.WindowShouldClose(window) {
 		// input
@@ -84,5 +93,18 @@ windowResize :: proc "cdecl" (window: glfw.WindowHandle, width: i32, height: i32
 processInput :: proc(window: glfw.WindowHandle) {
 	if glfw.GetKey(window, glfw.KEY_ESCAPE) == glfw.PRESS {
 		glfw.SetWindowShouldClose(window, true)
+	}
+}
+
+checkShaderCompilation :: proc(shaderId: u32) {
+	success: i32
+	info: [512]u8
+
+	gl.GetShaderiv(shaderId, gl.COMPILE_STATUS, &success)
+
+	if success == 0 {
+		gl.GetShaderInfoLog(shaderId, 512, nil, raw_data(info[:]))
+		err := string(cstring(raw_data(info[:])))
+		log.error(err)
 	}
 }
