@@ -3,12 +3,15 @@ package main
 import "base:runtime"
 import "core:fmt"
 import "core:log"
+import "core:math"
 import "core:strings"
+
 import gl "vendor:OpenGL"
 import "vendor:glfw"
 
 VERTEX_SHADER_SOURCE :: string(#load("shader.vert"))
 FRAGMENT_SHADER_SOURCE :: string(#load("shader.frag"))
+FRAGMENT_SHADER_YELLOW_SOURCE :: string(#load("shader_yellow.frag"))
 
 main :: proc() {
 	context.logger = log.create_console_logger()
@@ -34,35 +37,21 @@ main :: proc() {
 	gl.Viewport(0, 0, 800, 600)
 	glfw.SetFramebufferSizeCallback(window, windowResize)
 
-	// TRIANGLE
-	// 0 0 is middle -1 left, -1 down
+
 	// vertices := []f32 {
-	// 	0.5, // top right
-	// 	0.5,
-	// 	0.0,
-	// 	0.5, // bottom right
+	// 	// first triangle
+	// 	-0.9,
 	// 	-0.5,
-	// 	0.0,
-	// 	-0.5, // bottom left
+	// 	0.0, // left
+	// 	-0.0,
 	// 	-0.5,
-	// 	0.0,
-	// 	-0.5, //top left
+	// 	0.0, // right
+	// 	-0.45,
 	// 	0.5,
-	// 	0.0,
+	// 	0.0, // top
 	// }
 
-	vertices := []f32 {
-		// first triangle
-		-0.9,
-		-0.5,
-		0.0, // left
-		-0.0,
-		-0.5,
-		0.0, // right
-		-0.45,
-		0.5,
-		0.0, // top
-		// second triangle
+	vertices2 := []f32 {
 		0.0,
 		-0.5,
 		0.0, // left
@@ -73,6 +62,15 @@ main :: proc() {
 		0.5,
 		0.0, // top
 	}
+	
+	//odinfmt: disable
+	vertices := []f32{
+		// positions          // colors
+		 0.5, -0.5, 0.0,      1.0, 0.0, 0.0, // bottom right
+		-0.5, -0.5, 0.0,      0.0, 1.0, 0.0, // bottom left
+		 0.0,  0.5, 0.0,      0.0, 0.0, 1.0, // top
+	}
+	//odinfmt: enable
 
 	indices := []u32 {
 		0, // first triangle
@@ -88,6 +86,7 @@ main :: proc() {
 	gl.GenVertexArrays(1, &vao)
 	gl.BindVertexArray(vao) // activates it as a global
 
+
 	// vertex buffer object
 	vbo: u32 = 0
 	// generate a buffer, we can make more than one at a time
@@ -95,13 +94,40 @@ main :: proc() {
 	// bind the buffer
 	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
 
-
 	gl.BufferData(
 		gl.ARRAY_BUFFER,
 		len(vertices) * size_of(vertices[0]),
 		raw_data(vertices),
 		gl.STATIC_DRAW,
 	) // array_buffer = vbo (its bound)
+
+	// 0 == layout(location = 0) in vec3 aPos; in vertex shader
+	// also puts data of vbo to vao
+	gl.VertexAttribPointer(0, 3, gl.FLOAT, gl.FALSE, 6 * size_of(f32), uintptr(0))
+	gl.EnableVertexAttribArray(0)
+
+	gl.VertexAttribPointer(1, 3, gl.FLOAT, gl.FALSE, 6 * size_of(f32), uintptr(3 * size_of(f32)))
+	gl.EnableVertexAttribArray(1)
+
+
+	vao2: u32 = 0
+	gl.GenVertexArrays(1, &vao2)
+	gl.BindVertexArray(vao2)
+
+	vbo2: u32 = 0
+	gl.GenBuffers(1, &vbo2)
+	gl.BindBuffer(gl.ARRAY_BUFFER, vbo2)
+
+
+	gl.BufferData(
+		gl.ARRAY_BUFFER,
+		len(vertices2) * size_of(vertices2[0]),
+		raw_data(vertices2),
+		gl.STATIC_DRAW,
+	) // array_buffer = vbo (its bound)
+	gl.VertexAttribPointer(0, 3, gl.FLOAT, gl.FALSE, 3 * size_of(f32), uintptr(0))
+	gl.EnableVertexAttribArray(0)
+
 
 	// EBO
 	ebo: u32 = 0
@@ -128,22 +154,32 @@ main :: proc() {
 	gl.CompileShader(fragmentShaderId)
 	checkShaderCompilation(fragmentShaderId)
 
+
+	fragmentShaderYellowId := gl.CreateShader(gl.FRAGMENT_SHADER)
+	cFragmentShaderYellowSouce := strings.clone_to_cstring(FRAGMENT_SHADER_YELLOW_SOURCE)
+	gl.ShaderSource(fragmentShaderYellowId, 1, &cFragmentShaderYellowSouce, nil)
+	gl.CompileShader(fragmentShaderYellowId)
+	checkShaderCompilation(fragmentShaderYellowId)
+
 	shaderProgramId := gl.CreateProgram()
 	gl.AttachShader(shaderProgramId, vertexShaderId)
 	gl.AttachShader(shaderProgramId, fragmentShaderId)
 	gl.LinkProgram(shaderProgramId)
 	checkProgramLinking(shaderProgramId)
 
+
+	shaderProgramIdYellow := gl.CreateProgram()
+	gl.AttachShader(shaderProgramIdYellow, vertexShaderId)
+	gl.AttachShader(shaderProgramIdYellow, fragmentShaderYellowId)
+	gl.LinkProgram(shaderProgramIdYellow)
+	checkProgramLinking(shaderProgramIdYellow)
+
 	gl.UseProgram(shaderProgramId)
 
 	gl.DeleteShader(vertexShaderId)
 	gl.DeleteShader(fragmentShaderId)
 
-	// 0 == layout(location = 0) in vec3 aPos; in vertex shader
-	// also puts data of vbo to vao
-	gl.VertexAttribPointer(0, 3, gl.FLOAT, gl.FALSE, 3 * size_of(f32), uintptr(0))
 
-	gl.EnableVertexAttribArray(0)
 	gl.BindVertexArray(0)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
@@ -153,15 +189,28 @@ main :: proc() {
 		processInput(window)
 
 		// render
+
+		timeValue := glfw.GetTime()
+		greenValue: f32 = f32((math.sin(timeValue) / 2) + 0.5)
+		redValue: f32 = f32((math.cos(timeValue) / 2) + 0.5)
+		vertexColorLocation := gl.GetUniformLocation(shaderProgramId, "myColor")
+		gl.UseProgram(shaderProgramId) // activate the shader first to set the uniform
+		gl.Uniform4f(vertexColorLocation, redValue, greenValue, 0, 1)
+
+
 		gl.ClearColor(0.2, 0.3, 0.3, 1.0) // sets the color
 		gl.Clear(gl.COLOR_BUFFER_BIT) // uses the color to clear
 
-		gl.UseProgram(shaderProgramId)
+
 		gl.BindVertexArray(vao)
+		gl.DrawArrays(gl.TRIANGLES, 0, 3)
 
-		gl.DrawArrays(gl.TRIANGLES, 0, 6)
+		gl.UseProgram(shaderProgramIdYellow)
 
-		gl.PolygonMode(gl.FRONT_AND_BACK, gl.LINE)
+		gl.BindVertexArray(vao2)
+		gl.DrawArrays(gl.TRIANGLES, 0, 3)
+
+		gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 		//gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 
 		//gl.DrawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, rawptr(uintptr(0)))
