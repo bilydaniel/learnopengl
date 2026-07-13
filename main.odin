@@ -4,6 +4,7 @@ import "base:runtime"
 import "core:fmt"
 import "core:log"
 import "core:math"
+import "core:os"
 import "core:strings"
 
 import gl "vendor:OpenGL"
@@ -12,6 +13,94 @@ import "vendor:glfw"
 VERTEX_SHADER_SOURCE :: string(#load("shader.vert"))
 FRAGMENT_SHADER_SOURCE :: string(#load("shader.frag"))
 FRAGMENT_SHADER_YELLOW_SOURCE :: string(#load("shader_yellow.frag"))
+
+Shader :: struct {
+	id: u32,
+}
+
+shader_make :: proc(vertex_path: string, fragment_path: string) -> (Shader, bool) {
+	shader := Shader{}
+	temp := runtime.default_temp_allocator_temp_begin()
+	defer runtime.default_temp_allocator_temp_end(temp)
+
+	vertex_shader_source, err := os.read_entire_file(vertex_path, context.temp_allocator)
+	if err != nil {
+		fmt.eprintfln("vertex shader read error: %s", err)
+		return shader, false
+	}
+
+	fragment_shader_source, err2 := os.read_entire_file(fragment_path, context.temp_allocator)
+	if err2 != nil {
+		fmt.eprintfln("vertex shader read error: %s", err)
+		return shader, false
+	}
+
+	vertex_shader_id := shader_compile(gl.VERTEX_SHADER, string(vertex_shader_source))
+	fragment_shader_id := shader_compile(gl.FRAGMENT_SHADER, string(fragment_shader_source))
+
+	shader_program_id := gl.CreateProgram()
+	gl.AttachShader(shader_program_id, vertex_shader_id)
+	gl.AttachShader(shader_program_id, fragment_shader_id)
+	gl.LinkProgram(shader_program_id)
+	checkProgramLinking(shader_program_id)
+
+	gl.DeleteShader(vertex_shader_id)
+	gl.DeleteShader(fragment_shader_id)
+
+	shader.id = shader_program_id
+
+	return shader, true
+}
+
+shader_compile :: proc(shader_type: u32, shader_source: string) -> u32 {
+	shader_id := gl.CreateShader(shader_type)
+	shader_source_c := strings.clone_to_cstring(shader_source, context.temp_allocator)
+	gl.ShaderSource(shader_id, 1, &shader_source_c, nil)
+	gl.CompileShader(shader_id)
+	checkShaderCompilation(shader_id)
+
+	return shader_id
+}
+
+shader_use :: proc(shader: Shader) {
+	gl.UseProgram(shader.id)
+}
+
+shader_set_bool :: proc(shader: Shader, name: cstring, value: bool) {
+}
+
+shader_set_int :: proc(shader: Shader, name: cstring, value: i32) {
+}
+
+shader_set_float :: proc(shader: Shader, name: cstring, value: f32) {
+}
+
+checkShaderCompilation :: proc(shaderId: u32) {
+	success: i32
+	info: [512]u8
+
+	gl.GetShaderiv(shaderId, gl.COMPILE_STATUS, &success)
+
+	if success == 0 {
+		gl.GetShaderInfoLog(shaderId, 512, nil, raw_data(info[:]))
+		err := string(cstring(raw_data(info[:])))
+		log.error(err)
+	}
+}
+
+checkProgramLinking :: proc(shaderProgramId: u32) {
+	success: i32
+	info: [512]u8
+
+	gl.GetProgramiv(shaderProgramId, gl.LINK_STATUS, &success)
+
+	if success == 0 {
+		gl.GetProgramInfoLog(shaderProgramId, 512, nil, raw_data(info[:]))
+		err := string(cstring(raw_data(info[:])))
+		log.error(err)
+	}
+}
+
 
 main :: proc() {
 	context.logger = log.create_console_logger()
@@ -38,30 +127,6 @@ main :: proc() {
 	glfw.SetFramebufferSizeCallback(window, windowResize)
 
 
-	// vertices := []f32 {
-	// 	// first triangle
-	// 	-0.9,
-	// 	-0.5,
-	// 	0.0, // left
-	// 	-0.0,
-	// 	-0.5,
-	// 	0.0, // right
-	// 	-0.45,
-	// 	0.5,
-	// 	0.0, // top
-	// }
-
-	vertices2 := []f32 {
-		0.0,
-		-0.5,
-		0.0, // left
-		0.9,
-		-0.5,
-		0.0, // right
-		0.45,
-		0.5,
-		0.0, // top
-	}
 	
 	//odinfmt: disable
 	vertices := []f32{
@@ -110,25 +175,6 @@ main :: proc() {
 	gl.EnableVertexAttribArray(1)
 
 
-	vao2: u32 = 0
-	gl.GenVertexArrays(1, &vao2)
-	gl.BindVertexArray(vao2)
-
-	vbo2: u32 = 0
-	gl.GenBuffers(1, &vbo2)
-	gl.BindBuffer(gl.ARRAY_BUFFER, vbo2)
-
-
-	gl.BufferData(
-		gl.ARRAY_BUFFER,
-		len(vertices2) * size_of(vertices2[0]),
-		raw_data(vertices2),
-		gl.STATIC_DRAW,
-	) // array_buffer = vbo (its bound)
-	gl.VertexAttribPointer(0, 3, gl.FLOAT, gl.FALSE, 3 * size_of(f32), uintptr(0))
-	gl.EnableVertexAttribArray(0)
-
-
 	// EBO
 	ebo: u32 = 0
 	gl.GenBuffers(1, &ebo)
@@ -141,44 +187,12 @@ main :: proc() {
 	)
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo) // binding and unbinding ebo also binds it to the vao, so if you dont want to unbind them first unbind vao
 
-	vertexShaderId := gl.CreateShader(gl.VERTEX_SHADER)
-	cVertexShaderSouce := strings.clone_to_cstring(VERTEX_SHADER_SOURCE)
-	gl.ShaderSource(vertexShaderId, 1, &cVertexShaderSouce, nil)
-	gl.CompileShader(vertexShaderId)
-	checkShaderCompilation(vertexShaderId)
+	shader_program, ok := shader_make("shader.vert", "shader.frag")
+	if !ok {
+		return
+	}
 
-
-	fragmentShaderId := gl.CreateShader(gl.FRAGMENT_SHADER)
-	cFragmentShaderSouce := strings.clone_to_cstring(FRAGMENT_SHADER_SOURCE)
-	gl.ShaderSource(fragmentShaderId, 1, &cFragmentShaderSouce, nil)
-	gl.CompileShader(fragmentShaderId)
-	checkShaderCompilation(fragmentShaderId)
-
-
-	fragmentShaderYellowId := gl.CreateShader(gl.FRAGMENT_SHADER)
-	cFragmentShaderYellowSouce := strings.clone_to_cstring(FRAGMENT_SHADER_YELLOW_SOURCE)
-	gl.ShaderSource(fragmentShaderYellowId, 1, &cFragmentShaderYellowSouce, nil)
-	gl.CompileShader(fragmentShaderYellowId)
-	checkShaderCompilation(fragmentShaderYellowId)
-
-	shaderProgramId := gl.CreateProgram()
-	gl.AttachShader(shaderProgramId, vertexShaderId)
-	gl.AttachShader(shaderProgramId, fragmentShaderId)
-	gl.LinkProgram(shaderProgramId)
-	checkProgramLinking(shaderProgramId)
-
-
-	shaderProgramIdYellow := gl.CreateProgram()
-	gl.AttachShader(shaderProgramIdYellow, vertexShaderId)
-	gl.AttachShader(shaderProgramIdYellow, fragmentShaderYellowId)
-	gl.LinkProgram(shaderProgramIdYellow)
-	checkProgramLinking(shaderProgramIdYellow)
-
-	gl.UseProgram(shaderProgramId)
-
-	gl.DeleteShader(vertexShaderId)
-	gl.DeleteShader(fragmentShaderId)
-
+	shader_use(shader_program)
 
 	gl.BindVertexArray(0)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
@@ -193,8 +207,8 @@ main :: proc() {
 		timeValue := glfw.GetTime()
 		greenValue: f32 = f32((math.sin(timeValue) / 2) + 0.5)
 		redValue: f32 = f32((math.cos(timeValue) / 2) + 0.5)
-		vertexColorLocation := gl.GetUniformLocation(shaderProgramId, "myColor")
-		gl.UseProgram(shaderProgramId) // activate the shader first to set the uniform
+		vertexColorLocation := gl.GetUniformLocation(shader_program.id, "myColor")
+		shader_use(shader_program) // activate the shader first to set the uniform
 		gl.Uniform4f(vertexColorLocation, redValue, greenValue, 0, 1)
 
 
@@ -205,12 +219,7 @@ main :: proc() {
 		gl.BindVertexArray(vao)
 		gl.DrawArrays(gl.TRIANGLES, 0, 3)
 
-		gl.UseProgram(shaderProgramIdYellow)
 
-		gl.BindVertexArray(vao2)
-		gl.DrawArrays(gl.TRIANGLES, 0, 3)
-
-		gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 		//gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 
 		//gl.DrawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, rawptr(uintptr(0)))
@@ -232,31 +241,5 @@ windowResize :: proc "cdecl" (window: glfw.WindowHandle, width: i32, height: i32
 processInput :: proc(window: glfw.WindowHandle) {
 	if glfw.GetKey(window, glfw.KEY_ESCAPE) == glfw.PRESS {
 		glfw.SetWindowShouldClose(window, true)
-	}
-}
-
-checkShaderCompilation :: proc(shaderId: u32) {
-	success: i32
-	info: [512]u8
-
-	gl.GetShaderiv(shaderId, gl.COMPILE_STATUS, &success)
-
-	if success == 0 {
-		gl.GetShaderInfoLog(shaderId, 512, nil, raw_data(info[:]))
-		err := string(cstring(raw_data(info[:])))
-		log.error(err)
-	}
-}
-
-checkProgramLinking :: proc(shaderProgramId: u32) {
-	success: i32
-	info: [512]u8
-
-	gl.GetProgramiv(shaderProgramId, gl.LINK_STATUS, &success)
-
-	if success == 0 {
-		gl.GetProgramInfoLog(shaderProgramId, 512, nil, raw_data(info[:]))
-		err := string(cstring(raw_data(info[:])))
-		log.error(err)
 	}
 }
