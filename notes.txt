@@ -35,3 +35,25 @@ After all the corresponding color values have been determined, the final object 
 
 
 vertex buffer objects - store data on the gpu, sending them there is slow, so send batches, quick when they are already there, its the same as any open gl object
+
+vectors dont have to be in 0,0 then their coordinates are the delta
+
+normalizing = each value of vector divided by its length ||v||
+dot product of two vectors = ||v1|| * ||v2|| * cos theta
+calculation is component wise product and then summed, we can then take arccos to get the angle
+
+cross product => creates orthogonal vector, get more details elsewhere, not much here
+
+2x3 matrix has 2 rows and 3 columns, rows are dimensions
+
+first do scaling, then rotations, then translations
+
+local / object space
+world space
+view / eye space 
+clip space
+screen space
+
+local space -> model matrix -> world space -> view matrix -> view space -> projection matrix -> clip space -> viewport transform -> screen space
+
+Vclip = Mprojection * Mview * Mmodel * Vlocal (result goes to gl_position)

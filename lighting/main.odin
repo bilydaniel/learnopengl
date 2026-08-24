@@ -121,7 +121,7 @@ Camera :: struct {
 
 init_camera :: proc() -> ^Camera {
 	camera := new(Camera)
-	camera.pos = la.Vector3f32{0, 0, 3}
+	camera.pos = la.Vector3f32{0, 0, 6}
 	camera.front = la.Vector3f32{0, 0, -1}
 	camera.up = la.Vector3f32{0, 1, 0}
 	camera.fov = 45
@@ -133,12 +133,11 @@ init_camera :: proc() -> ^Camera {
 
 
 get_view_matrix :: proc(camera: ^Camera) -> la.Matrix4f32 {
+	//TODO: @finish
 	result := la.Matrix4f32{}
 
 	return result
 }
-
-ratio: f32 = 0.2
 
 d_time: f32 = 0
 last_frame: f32 = 0
@@ -147,6 +146,8 @@ last_mouse_x: f64 = 400
 last_mouse_y: f64 = 300
 first_mouse := true
 camera: ^Camera = nil
+
+light_pos: la.Vector3f32 = {1.2, 1.0, 2.0}
 
 main :: proc() {
 	context.logger = log.create_console_logger()
@@ -168,6 +169,7 @@ main :: proc() {
 	gl.load_up_to(3, 3, glfw.gl_set_proc_address)
 
 	gl.Viewport(0, 0, 800, 600)
+	gl.Enable(gl.DEPTH_TEST)
 	glfw.SetFramebufferSizeCallback(window, windowResize)
 	glfw.SetCursorPosCallback(window, mouse_callback)
 	glfw.SetScrollCallback(window, scroll_callback)
@@ -175,70 +177,97 @@ main :: proc() {
 
 	vertices: [dynamic]f32 = {}
 
-	append(&vertices, -0.5, -0.5, -0.5, 0.0, 0.0)
-	append(&vertices, 0.5, -0.5, -0.5, 1.0, 0.0)
-	append(&vertices, 0.5, 0.5, -0.5, 1.0, 1.0)
-	append(&vertices, 0.5, 0.5, -0.5, 1.0, 1.0)
-	append(&vertices, -0.5, 0.5, -0.5, 0.0, 1.0)
-	append(&vertices, -0.5, -0.5, -0.5, 0.0, 0.0)
+	// Back Face
+	append(&vertices, -0.5, -0.5, -0.5)
+	append(&vertices, 0.0, 0.0, -1.0)
+	append(&vertices, 0.5, -0.5, -0.5)
+	append(&vertices, 0.0, 0.0, -1.0)
+	append(&vertices, 0.5, 0.5, -0.5)
+	append(&vertices, 0.0, 0.0, -1.0)
+	append(&vertices, 0.5, 0.5, -0.5)
+	append(&vertices, 0.0, 0.0, -1.0)
+	append(&vertices, -0.5, 0.5, -0.5)
+	append(&vertices, 0.0, 0.0, -1.0)
+	append(&vertices, -0.5, -0.5, -0.5)
+	append(&vertices, 0.0, 0.0, -1.0)
 
-	append(&vertices, -0.5, -0.5, 0.5, 0.0, 0.0)
-	append(&vertices, 0.5, -0.5, 0.5, 1.0, 0.0)
-	append(&vertices, 0.5, 0.5, 0.5, 1.0, 1.0)
-	append(&vertices, 0.5, 0.5, 0.5, 1.0, 1.0)
-	append(&vertices, -0.5, 0.5, 0.5, 0.0, 1.0)
-	append(&vertices, -0.5, -0.5, 0.5, 0.0, 0.0)
+	// Front Face
+	append(&vertices, -0.5, -0.5, 0.5)
+	append(&vertices, 0.0, 0.0, 1.0)
+	append(&vertices, 0.5, -0.5, 0.5)
+	append(&vertices, 0.0, 0.0, 1.0)
+	append(&vertices, 0.5, 0.5, 0.5)
+	append(&vertices, 0.0, 0.0, 1.0)
+	append(&vertices, 0.5, 0.5, 0.5)
+	append(&vertices, 0.0, 0.0, 1.0)
+	append(&vertices, -0.5, 0.5, 0.5)
+	append(&vertices, 0.0, 0.0, 1.0)
+	append(&vertices, -0.5, -0.5, 0.5)
+	append(&vertices, 0.0, 0.0, 1.0)
 
-	append(&vertices, -0.5, 0.5, 0.5, 1.0, 0.0)
-	append(&vertices, -0.5, 0.5, -0.5, 1.0, 1.0)
-	append(&vertices, -0.5, -0.5, -0.5, 0.0, 1.0)
-	append(&vertices, -0.5, -0.5, -0.5, 0.0, 1.0)
-	append(&vertices, -0.5, -0.5, 0.5, 0.0, 0.0)
-	append(&vertices, -0.5, 0.5, 0.5, 1.0, 0.0)
+	// Left Face
+	append(&vertices, -0.5, 0.5, 0.5)
+	append(&vertices, -1.0, 0.0, 0.0)
+	append(&vertices, -0.5, 0.5, -0.5)
+	append(&vertices, -1.0, 0.0, 0.0)
+	append(&vertices, -0.5, -0.5, -0.5)
+	append(&vertices, -1.0, 0.0, 0.0)
+	append(&vertices, -0.5, -0.5, -0.5)
+	append(&vertices, -1.0, 0.0, 0.0)
+	append(&vertices, -0.5, -0.5, 0.5)
+	append(&vertices, -1.0, 0.0, 0.0)
+	append(&vertices, -0.5, 0.5, 0.5)
+	append(&vertices, -1.0, 0.0, 0.0)
 
-	append(&vertices, 0.5, 0.5, 0.5, 1.0, 0.0)
-	append(&vertices, 0.5, 0.5, -0.5, 1.0, 1.0)
-	append(&vertices, 0.5, -0.5, -0.5, 0.0, 1.0)
-	append(&vertices, 0.5, -0.5, -0.5, 0.0, 1.0)
-	append(&vertices, 0.5, -0.5, 0.5, 0.0, 0.0)
-	append(&vertices, 0.5, 0.5, 0.5, 1.0, 0.0)
+	// Right Face
+	append(&vertices, 0.5, 0.5, 0.5)
+	append(&vertices, 1.0, 0.0, 0.0)
+	append(&vertices, 0.5, 0.5, -0.5)
+	append(&vertices, 1.0, 0.0, 0.0)
+	append(&vertices, 0.5, -0.5, -0.5)
+	append(&vertices, 1.0, 0.0, 0.0)
+	append(&vertices, 0.5, -0.5, -0.5)
+	append(&vertices, 1.0, 0.0, 0.0)
+	append(&vertices, 0.5, -0.5, 0.5)
+	append(&vertices, 1.0, 0.0, 0.0)
+	append(&vertices, 0.5, 0.5, 0.5)
+	append(&vertices, 1.0, 0.0, 0.0)
 
-	append(&vertices, -0.5, -0.5, -0.5, 0.0, 1.0)
-	append(&vertices, 0.5, -0.5, -0.5, 1.0, 1.0)
-	append(&vertices, 0.5, -0.5, 0.5, 1.0, 0.0)
-	append(&vertices, 0.5, -0.5, 0.5, 1.0, 0.0)
-	append(&vertices, -0.5, -0.5, 0.5, 0.0, 0.0)
-	append(&vertices, -0.5, -0.5, -0.5, 0.0, 1.0)
+	// Bottom Face
+	append(&vertices, -0.5, -0.5, -0.5)
+	append(&vertices, 0.0, -1.0, 0.0)
+	append(&vertices, 0.5, -0.5, -0.5)
+	append(&vertices, 0.0, -1.0, 0.0)
+	append(&vertices, 0.5, -0.5, 0.5)
+	append(&vertices, 0.0, -1.0, 0.0)
+	append(&vertices, 0.5, -0.5, 0.5)
+	append(&vertices, 0.0, -1.0, 0.0)
+	append(&vertices, -0.5, -0.5, 0.5)
+	append(&vertices, 0.0, -1.0, 0.0)
+	append(&vertices, -0.5, -0.5, -0.5)
+	append(&vertices, 0.0, -1.0, 0.0)
 
-	append(&vertices, -0.5, 0.5, -0.5, 0.0, 1.0)
-	append(&vertices, 0.5, 0.5, -0.5, 1.0, 1.0)
-	append(&vertices, 0.5, 0.5, 0.5, 1.0, 0.0)
-	append(&vertices, 0.5, 0.5, 0.5, 1.0, 0.0)
-	append(&vertices, -0.5, 0.5, 0.5, 0.0, 0.0)
-	append(&vertices, -0.5, 0.5, -0.5, 0.0, 1.0)
-
-	cube_positions := [dynamic]la.Vector3f32{}
-	append(&cube_positions, la.Vector3f32{0, 0, 0})
-	append(&cube_positions, la.Vector3f32{2, 5, -15})
-	append(&cube_positions, la.Vector3f32{-1.5, -2.2, -2.5})
-	append(&cube_positions, la.Vector3f32{-3.8, -2, -12.3})
-	append(&cube_positions, la.Vector3f32{2.4, -0.4, -3.5})
-	append(&cube_positions, la.Vector3f32{-1.7, 3, -7.5})
-	append(&cube_positions, la.Vector3f32{1.3, -2, -2.5})
-	append(&cube_positions, la.Vector3f32{1.5, 2, -2.5})
-	append(&cube_positions, la.Vector3f32{1.5, 0.2, -1.5})
-	append(&cube_positions, la.Vector3f32{-1.3, 1, -1.5})
+	// Top Face
+	append(&vertices, -0.5, 0.5, -0.5)
+	append(&vertices, 0.0, 1.0, 0.0)
+	append(&vertices, 0.5, 0.5, -0.5)
+	append(&vertices, 0.0, 1.0, 0.0)
+	append(&vertices, 0.5, 0.5, 0.5)
+	append(&vertices, 0.0, 1.0, 0.0)
+	append(&vertices, 0.5, 0.5, 0.5)
+	append(&vertices, 0.0, 1.0, 0.0)
+	append(&vertices, -0.5, 0.5, 0.5)
+	append(&vertices, 0.0, 1.0, 0.0)
+	append(&vertices, -0.5, 0.5, -0.5)
+	append(&vertices, 0.0, 1.0, 0.0)
 
 	vao: u32 = 0
 	gl.GenVertexArrays(1, &vao)
-	gl.BindVertexArray(vao) // activates it as a global
+	gl.BindVertexArray(vao)
 
 
-	// vertex buffer object
 	vbo: u32 = 0
-	// generate a buffer, we can make more than one at a time
 	gl.GenBuffers(1, &vbo)
-	// bind the buffer
 	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
 
 	gl.BufferData(
@@ -246,99 +275,58 @@ main :: proc() {
 		len(vertices) * size_of(vertices[0]),
 		raw_data(vertices),
 		gl.STATIC_DRAW,
-	) // array_buffer = vbo (its bound)
+	)
 
-
-	// 0 == layout(location = 0) in vec3 aPos; in vertex shader
-	// also puts data of vbo to vao
-
-	stride: i32 = 5 * size_of(f32)
-
+	stride: i32 = 6 * size_of(f32)
 	// POS
 	gl.VertexAttribPointer(0, 3, gl.FLOAT, gl.FALSE, stride, uintptr(0))
 	gl.EnableVertexAttribArray(0)
-
-	// COLOR
-	// gl.VertexAttribPointer(1, 3, gl.FLOAT, gl.FALSE, 8 * size_of(f32), uintptr(3 * size_of(f32)))
-	// gl.EnableVertexAttribArray(1)
-
-	// TEXTURE
-	gl.VertexAttribPointer(1, 2, gl.FLOAT, gl.FALSE, stride, uintptr(3 * size_of(f32)))
+	// NORMAL
+	gl.VertexAttribPointer(1, 3, gl.FLOAT, gl.FALSE, stride, uintptr(0))
 	gl.EnableVertexAttribArray(1)
 
-
-	// EBO
-	// ebo: u32 = 0
-	// gl.GenBuffers(1, &ebo)
-	// gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
-	// gl.BufferData(
-	// 	gl.ELEMENT_ARRAY_BUFFER,
-	// 	len(indices) * size_of(indices[0]),
-	// 	raw_data(indices),
-	// 	gl.STATIC_DRAW,
-	// )
-	// gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo) // binding and unbinding ebo also binds it to the vao, so if you dont want to unbind them first unbind vao
-
-	shader_program, ok := shader_make("shader.vert", "shader.frag")
-	if !ok {
+	lighting_shader, lighting_shader_ok := shader_make(
+		"lighting_shader.vert",
+		"lighting_shader.frag",
+	)
+	if !lighting_shader_ok {
 		return
 	}
-
-	shader_use(shader_program)
+	shader_use(lighting_shader)
+	shader_set_vec3(lighting_shader, "objectColor", raw_data(&[3]f32{1.0, 0.5, 0.31}))
+	shader_set_vec3(lighting_shader, "lightColor", raw_data(&[3]f32{1.0, 1.0, 1.0}))
 
 	gl.BindVertexArray(0)
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 
-	width, height, channels: i32
-	container := stbi.load("container.jpg", &width, &height, &channels, 0)
-	if container == nil {
-		log.error("failed loading file")
+	model_location := gl.GetUniformLocation(lighting_shader.id, "model")
+	view_location := gl.GetUniformLocation(lighting_shader.id, "view")
+	projection_location := gl.GetUniformLocation(lighting_shader.id, "projection")
+
+
+	light_vao: u32 = 0
+	gl.GenVertexArrays(1, &light_vao)
+	gl.BindVertexArray(light_vao)
+	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+
+	//POS
+	gl.VertexAttribPointer(0, 3, gl.FLOAT, gl.FALSE, stride, uintptr(0))
+	gl.EnableVertexAttribArray(0)
+
+
+	light_source_shader, light_source_ok := shader_make(
+		"light_source_shader.vert",
+		"light_source_shader.frag",
+	)
+	if !light_source_ok {
 		return
 	}
+	shader_use(light_source_shader)
 
-	texture: u32
-	gl.GenTextures(1, &texture)
-	gl.ActiveTexture(gl.TEXTURE0)
-	gl.BindTexture(gl.TEXTURE_2D, texture)
+	model_location_light_source := gl.GetUniformLocation(light_source_shader.id, "model")
+	view_location_light_source := gl.GetUniformLocation(light_source_shader.id, "view")
+	projection_location_light_source := gl.GetUniformLocation(light_source_shader.id, "projection")
 
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_BORDER)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_BORDER)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-
-	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB, width, height, 0, gl.RGB, gl.UNSIGNED_BYTE, container)
-	gl.GenerateMipmap(gl.TEXTURE_2D)
-	stbi.image_free(container)
-
-	stbi.set_flip_vertically_on_load(1)
-	face := stbi.load("awesomeface.png", &width, &height, &channels, 0)
-	if face == nil {
-		log.error("failed loading face")
-		return
-	}
-
-	texture2: u32
-	gl.GenTextures(1, &texture2)
-	gl.ActiveTexture(gl.TEXTURE1)
-	gl.BindTexture(gl.TEXTURE_2D, texture2)
-
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-
-	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, face)
-	gl.GenerateMipmap(gl.TEXTURE_2D)
-	stbi.image_free(face)
-
-	shader_set_int(shader_program, "texture1", 0)
-	shader_set_int(shader_program, "texture2", 1)
-
-	model_location := gl.GetUniformLocation(shader_program.id, "model")
-	view_location := gl.GetUniformLocation(shader_program.id, "view")
-	projection_location := gl.GetUniformLocation(shader_program.id, "projection")
-
-	gl.Enable(gl.DEPTH_TEST)
 
 	for !glfw.WindowShouldClose(window) {
 		current_frame := f32(glfw.GetTime())
@@ -346,42 +334,47 @@ main :: proc() {
 		last_frame = current_frame
 
 		process_input(window) // input
+		shader_use(lighting_shader) // activate the shader first to set the uniform
+		shader_set_vec3(lighting_shader, "lightPos", raw_data(&light_pos))
 
-		shader_set_float(shader_program, "ratio", ratio)
-
-		// render
-		//vertexColorLocation := gl.GetUniformLocation(shader_program.id, "myColor")
-		shader_use(shader_program) // activate the shader first to set the uniform
-
-		gl.ClearColor(0.2, 0.3, 0.3, 1.0) // sets the color
-		gl.Clear(gl.COLOR_BUFFER_BIT) // uses the color to clear
+		gl.ClearColor(0.2, 0.3, 0.3, 1.0)
+		gl.Clear(gl.COLOR_BUFFER_BIT)
 		gl.Clear(gl.DEPTH_BUFFER_BIT)
 
 		gl.BindVertexArray(vao)
-
-		//gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
-
 		view := la.matrix4_look_at_f32(camera.pos, camera.pos + camera.front, camera.up)
 		perspective := la.matrix4_perspective(math.to_radians(camera.fov), 800.0 / 600, 0.1, 100.0)
+
 		gl.UniformMatrix4fv(view_location, 1, gl.FALSE, raw_data(&view))
 		gl.UniformMatrix4fv(projection_location, 1, gl.FALSE, raw_data(&perspective))
 
-		for i := 0; i < len(cube_positions); i += 1 {
-			translate := la.matrix4_translate(cube_positions[i])
+		translate := la.matrix4_translate(la.Vector3f32{0, 0, 0})
+		angle: f32 = 0
+		rotate := la.matrix4_rotate(angle, la.Vector3f32{1.0, 0.0, 0.0})
+		model := translate * rotate
+		gl.UniformMatrix4fv(model_location, 1, gl.FALSE, raw_data(&model))
 
-			angle: f32 = 20 * f32(i)
-			if i % 2 == 0 {
-				angle += f32(glfw.GetTime())
-			} else {
-				angle -= f32(glfw.GetTime())
-			}
+		gl.DrawArrays(gl.TRIANGLES, 0, 36)
 
-			rotate := la.matrix4_rotate(angle, la.Vector3f32{1.0, 0.3, 0.5})
-			model := translate * rotate
-			gl.UniformMatrix4fv(model_location, 1, gl.FALSE, raw_data(&model))
+		// LIGHT SOURCE
+		shader_use(light_source_shader)
+		gl.BindVertexArray(light_vao)
+		gl.UniformMatrix4fv(view_location_light_source, 1, gl.FALSE, raw_data(&view))
+		gl.UniformMatrix4fv(projection_location_light_source, 1, gl.FALSE, raw_data(&perspective))
 
-			gl.DrawArrays(gl.TRIANGLES, 0, 36)
-		}
+		translate_light_source := la.matrix4_translate(light_pos)
+		angle_light_source: f32 = 0
+		rotate_light_source := la.matrix4_rotate(angle_light_source, la.Vector3f32{1.0, 0.0, 0.0})
+		scale_light_source := la.matrix4_scale(la.Vector3f32{0.2, 0.2, 0.2})
+		model_light_source := translate_light_source * rotate_light_source * scale_light_source
+		gl.UniformMatrix4fv(
+			model_location_light_source,
+			1,
+			gl.FALSE,
+			raw_data(&model_light_source),
+		)
+
+		gl.DrawArrays(gl.TRIANGLES, 0, 36)
 
 		gl.BindVertexArray(0)
 
@@ -403,13 +396,6 @@ process_input :: proc(window: glfw.WindowHandle) {
 	}
 
 	ratio_delta: f32 = 0.001
-	if glfw.GetKey(window, glfw.KEY_UP) == glfw.PRESS {
-		ratio += ratio_delta
-	}
-
-	if glfw.GetKey(window, glfw.KEY_DOWN) == glfw.PRESS {
-		ratio -= ratio_delta
-	}
 
 	camera_speed: f32 = 2.5 * d_time
 	if glfw.GetKey(window, glfw.KEY_W) == glfw.PRESS {
