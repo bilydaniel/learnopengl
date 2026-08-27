@@ -29,7 +29,7 @@ shader_make :: proc(vertex_path: string, fragment_path: string) -> (Shader, bool
 
 	fragment_shader_source, err2 := os.read_entire_file(fragment_path, context.temp_allocator)
 	if err2 != nil {
-		fmt.eprintfln("vertex shader read error: %s", err)
+		fmt.eprintfln("vertex shader read error: %s", err2)
 		return shader, false
 	}
 
@@ -282,7 +282,7 @@ main :: proc() {
 	gl.VertexAttribPointer(0, 3, gl.FLOAT, gl.FALSE, stride, uintptr(0))
 	gl.EnableVertexAttribArray(0)
 	// NORMAL
-	gl.VertexAttribPointer(1, 3, gl.FLOAT, gl.FALSE, stride, uintptr(0))
+	gl.VertexAttribPointer(1, 3, gl.FLOAT, gl.FALSE, stride, uintptr(3 * size_of(f32)))
 	gl.EnableVertexAttribArray(1)
 
 	lighting_shader, lighting_shader_ok := shader_make(
@@ -335,7 +335,13 @@ main :: proc() {
 
 		process_input(window) // input
 		shader_use(lighting_shader) // activate the shader first to set the uniform
+
+
+		t := f32(glfw.GetTime())
+		light_pos.x = 10 * math.cos(t)
+		light_pos.z = 10 * math.sin(t)
 		shader_set_vec3(lighting_shader, "lightPos", raw_data(&light_pos))
+		shader_set_vec3(lighting_shader, "cameraPos", raw_data(&camera.pos))
 
 		gl.ClearColor(0.2, 0.3, 0.3, 1.0)
 		gl.Clear(gl.COLOR_BUFFER_BIT)
@@ -414,6 +420,14 @@ process_input :: proc(window: glfw.WindowHandle) {
 	if glfw.GetKey(window, glfw.KEY_D) == glfw.PRESS {
 		camera_right := la.normalize(la.cross(camera.front, camera.up))
 		camera.pos += camera_right * camera_speed
+	}
+
+	if glfw.GetKey(window, glfw.KEY_SPACE) == glfw.PRESS {
+		camera.pos += camera.up * camera_speed
+	}
+
+	if glfw.GetKey(window, glfw.KEY_LEFT_CONTROL) == glfw.PRESS {
+		camera.pos -= camera.up * camera_speed
 	}
 
 }
